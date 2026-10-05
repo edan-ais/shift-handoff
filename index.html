@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shift Handoff</title>
+<style>body{font:16px system-ui;max-width:820px;margin:2rem auto;padding:0 1rem}textarea{width:100%;height:9rem}
+.row{display:flex;gap:.5rem;align-items:center;margin:.4rem 0}.row input[type=text]{flex:1}.gap{background:#fff3cd}
+.inc{color:#b00020}button{padding:.4rem .8rem}pre{background:#f4f4f4;padding:1rem;white-space:pre-wrap}</style></head><body>
+<h1>Shift Handoff</h1><p>Paste your shift notes. One line per item. Start a line with "!" or "incident:" for incidents. Everything stays in this browser.</p>
+<textarea id="notes" placeholder="Walk-in cooler running warm&#10;!Customer slipped near door, no injury&#10;Order napkins"></textarea>
+<div><button id="parse">Propose tasks</button> <button id="clear">Clear</button></div>
+<h2>Review</h2><div id="list"></div><button id="add">+ Add item</button>
+<h2>Next-shift handoff</h2><button id="export">Build handoff</button> <button id="copy">Copy</button><pre id="out"></pre>
+<script>
+let items=JSON.parse(localStorage.getItem('sh_items')||'[]');
+const $=id=>document.getElementById(id);
+const save=()=>localStorage.setItem('sh_items',JSON.stringify(items));
+function render(){$('list').innerHTML='';items.forEach((it,i)=>{const d=document.createElement('div');d.className='row'+((!it.owner||!it.due)?' gap':'');
+d.innerHTML=`<select><option value="task">Task</option><option value="incident">Incident</option></select><input type="text" class="t" placeholder="what">
+<input type="text" class="o" placeholder="owner" size="10"><input type="date" class="d"><button>x</button>`;
+const [s,t,o,dt,b]=[...d.children];s.value=it.type;t.value=it.text;o.value=it.owner||'';dt.value=it.due||'';
+s.onchange=()=>{it.type=s.value;save()};t.oninput=()=>{it.text=t.value;save()};
+o.oninput=()=>{it.owner=o.value;save();d.classList.toggle('gap',!it.owner||!it.due)};
+dt.oninput=()=>{it.due=dt.value;save();d.classList.toggle('gap',!it.owner||!it.due)};
+b.onclick=()=>{items.splice(i,1);save();render()};$('list').append(d)})}
+$('parse').onclick=()=>{$('notes').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+const inc=/^(!|incident:)/i.test(l);items.push({type:inc?'incident':'task',text:l.replace(/^(!|incident:)\s*/i,''),owner:'',due:''})});save();render()};
+$('add').onclick=()=>{items.push({type:'task',text:'',owner:'',due:''});save();render()};
+$('clear').onclick=()=>{items=[];save();render();$('out').textContent=''};
+$('export').onclick=()=>{const f=(ty)=>items.filter(i=>i.type===ty&&i.text).map(i=>`- ${i.text} | owner: ${i.owner||'UNASSIGNED'} | due: ${i.due||'NO DATE'}${(!i.owner||!i.due)?'  <-- NEEDS ATTENTION':''}`).join('\n')||'- none';
+const gaps=items.filter(i=>i.text&&(!i.owner||!i.due)).length;
+$('out').textContent=`SHIFT HANDOFF ${new Date().toLocaleDateString()}\n${gaps?`WARNING: ${gaps} item(s) missing owner or date\n`:''}\nINCIDENTS\n${f('incident')}\n\nTASKS\n${f('task')}\n`};
+$('copy').onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($('out').textContent);
+render();
+</script></body></html>
